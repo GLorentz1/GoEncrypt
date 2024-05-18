@@ -10,7 +10,36 @@ import (
 	"strings"
 )
 
-func handleEncryptedDownload(w http.ResponseWriter, req *http.Request, repository map[string]EncryptedFileData, id string) {
+type apiError struct {
+	Err    string
+	Status int
+}
+
+func (e apiError) Error() string {
+	return e.Err
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) error {
+	w.WriteHeader(status)
+	w.Header().Add("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(v)
+}
+
+type apiFunc func(http.ResponseWriter, *http.Request) error
+
+func makeHttpHandlerFunc(f apiFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		if err := f(w, req); err != nil {
+			if e, ok := err.(apiError); ok {
+				_ = writeJSON(w, e.Status, e)
+				return
+			}
+			_ = writeJSON(w, http.StatusInternalServerError, apiError{Err: "Internal Server Error.", Status: http.StatusInternalServerError})
+		}
+	}
+}
+
+func HandleEncryptedDownload(w http.ResponseWriter, req *http.Request, repository map[string]EncryptedFileData, id string) {
 	if req.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -31,7 +60,7 @@ func handleEncryptedDownload(w http.ResponseWriter, req *http.Request, repositor
 
 }
 
-func handlePlainDownload(w http.ResponseWriter, req *http.Request, repository map[string]FileData, id string) {
+func HandlePlainDownload(w http.ResponseWriter, req *http.Request, repository map[string]FileData, id string) {
 	if req.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -51,7 +80,7 @@ func handlePlainDownload(w http.ResponseWriter, req *http.Request, repository ma
 
 }
 
-func handleEncryptedFileUpload(writer http.ResponseWriter, request *http.Request, encryptedFileChannel chan EncryptedFileData) {
+func HandleEncryptedFileUpload(writer http.ResponseWriter, request *http.Request, encryptedFileChannel chan EncryptedFileData) {
 	if request.Method != http.MethodPost {
 		http.Error(writer, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -93,7 +122,7 @@ func handleEncryptedFileUpload(writer http.ResponseWriter, request *http.Request
 	}
 }
 
-func handlePlainFileUpload(writer http.ResponseWriter, request *http.Request, fileChannel chan FileData) {
+func HandlePlainFileUpload(writer http.ResponseWriter, request *http.Request, fileChannel chan FileData) {
 	if request.Method != http.MethodPost {
 		http.Error(writer, "Method not allowed", http.StatusMethodNotAllowed)
 	}

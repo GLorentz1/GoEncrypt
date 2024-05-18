@@ -32,31 +32,31 @@ func main() {
 	plainDataRepository := make(map[string]FileData, 10)
 
 	router.HandleFunc("/encrypt", func(writer http.ResponseWriter, request *http.Request) {
-		handlePlainFileUpload(writer, request, fileChannel)
+		HandlePlainFileUpload(writer, request, fileChannel)
 	})
 
 	router.HandleFunc("/decrypt", func(writer http.ResponseWriter, request *http.Request) {
-		handleEncryptedFileUpload(writer, request, encryptedFileChannel)
+		HandleEncryptedFileUpload(writer, request, encryptedFileChannel)
 	})
 
 	router.HandleFunc("/download/encrypted/{uuid}", func(writer http.ResponseWriter, request *http.Request) {
 		uuidFromRequest := mux.Vars(request)["uuid"]
-		handleEncryptedDownload(writer, request, encryptedDataRepository, uuidFromRequest)
+		HandleEncryptedDownload(writer, request, encryptedDataRepository, uuidFromRequest)
 	})
 
 	router.HandleFunc("/download/decrypted/{uuid}", func(writer http.ResponseWriter, request *http.Request) {
 		uuidFromRequest := mux.Vars(request)["uuid"]
-		handlePlainDownload(writer, request, plainDataRepository, uuidFromRequest)
+		HandlePlainDownload(writer, request, plainDataRepository, uuidFromRequest)
 	})
 
 	for range 5 {
 		wg.Add(1)
-		go encryptFile(fileChannel, encryptedDataRepository)
+		go EncryptFile(fileChannel, encryptedDataRepository)
 	}
 
 	for range 5 {
 		wg.Add(1)
-		go decryptFile(encryptedFileChannel, plainDataRepository)
+		go DecryptFile(encryptedFileChannel, plainDataRepository)
 	}
 
 	errListenAndServe := http.ListenAndServe(":5678", router)

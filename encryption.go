@@ -9,7 +9,7 @@ import (
 	"io"
 )
 
-func encryptFile(fileDataChannel chan FileData, repository map[string]EncryptedFileData) {
+func EncryptFile(fileDataChannel chan FileData, repository map[string]EncryptedFileData) {
 
 	for fileData := range fileDataChannel {
 		salt := make([]byte, 16)
@@ -46,7 +46,7 @@ func encryptFile(fileDataChannel chan FileData, repository map[string]EncryptedF
 
 }
 
-func decryptFile(encryptedFileChannel chan EncryptedFileData, repository map[string]FileData) {
+func DecryptFile(encryptedFileChannel chan EncryptedFileData, repository map[string]FileData) {
 	for encryptedFile := range encryptedFileChannel {
 		ciphertext := encryptedFile.bytes
 		salt := ciphertext[:16]
