@@ -5,29 +5,30 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"strings"
 )
 
-func HandleEncryptedDownload(w http.ResponseWriter, req *http.Request, repository map[string]EncryptedFileData, id string) {
+func HandleEncryptedDownload(w http.ResponseWriter, req *http.Request, repository *S3Context, id string) {
 	if req.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 
-	data := repository[id]
-	if data.bytes == nil {
-		w.WriteHeader(http.StatusAccepted)
-	} else {
-		w.Header().Set("Content-Type", "application/octet-stream")
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", "encrypted_"+data.filename+".enc"))
-		w.WriteHeader(http.StatusOK)
-		_, err := w.Write(data.bytes)
-
-		if err != nil {
-			http.Error(w, "Error writing encrypted file to response writer", http.StatusInternalServerError)
-		}
-	}
+	//data := repository[id]
+	//if data.bytes == nil {
+	//	w.WriteHeader(http.StatusAccepted)
+	//} else {
+	//	w.Header().Set("Content-Type", "application/octet-stream")
+	//	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", "encrypted_"+data.filename+".enc"))
+	//	w.WriteHeader(http.StatusOK)
+	//	_, err := w.Write(data.bytes)
+	//
+	//	if err != nil {
+	//		http.Error(w, "Error writing encrypted file to response writer", http.StatusInternalServerError)
+	//	}
+	//}
 
 }
 
@@ -114,15 +115,32 @@ func HandlePlainFileUpload(writer http.ResponseWriter, request *http.Request, fi
 		}
 	}(file)
 
-	fileBytes, errorReadBytes := io.ReadAll(file)
-	if errorReadBytes != nil {
-		http.Error(writer, "Error reading file bytes", http.StatusInternalServerError)
-	}
-
+	const bufferLimit = 5 * 1024 * 1024
+	bufferSize := bufferLimit
 	fileUUID := uuid.New()
-
 	password := request.FormValue("password")
-	fileChannel <- FileData{filename: handler.Filename, password: password, fileUUID: fileUUID, bytes: fileBytes}
+	buffer := make([]byte, bufferSize)
+	var counter int32 = 1
+
+	for {
+		n, err := file.Read(buffer)
+
+		if err != nil && err != io.EOF {
+			http.Error(writer, "Error reading file", http.StatusInternalServerError)
+		}
+
+		log.Printf("Sending chunk %d with n {%d} bytes", counter, n)
+
+		fileChannel <- FileData{filename: handler.Filename, password: password, fileUUID: fileUUID,
+			bytes: buffer[:n], isLastChunk: err == io.EOF || n < bufferLimit, counter: counter}
+
+		if err == io.EOF || n < bufferLimit {
+			log.Printf("Found EOF when counter was %d", counter)
+			break
+		}
+
+		counter += 1
+	}
 
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)

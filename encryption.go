@@ -9,7 +9,7 @@ import (
 	"io"
 )
 
-func EncryptFile(fileDataChannel chan FileData, repository map[string]EncryptedFileData) {
+func EncryptFile(fileDataChannel chan FileData, s3Context *S3Context) {
 
 	for fileData := range fileDataChannel {
 		salt := make([]byte, 16)
@@ -40,8 +40,10 @@ func EncryptFile(fileDataChannel chan FileData, repository map[string]EncryptedF
 		ciphertext := aesGCM.Seal(nonce, nonce, fileData.bytes, nil)
 		ciphertext = append(salt, ciphertext...)
 
-		repository[fileData.fileUUID.String()] =
-			EncryptedFileData{filename: fileData.filename, fileUUID: fileData.fileUUID, bytes: ciphertext}
+		encryptedData := EncryptedFileData{filename: fileData.filename, fileUUID: fileData.fileUUID,
+			bytes: ciphertext, isLastChunk: fileData.isLastChunk, counter: fileData.counter}
+
+		go UploadPart(s3Context, encryptedData)
 	}
 
 }

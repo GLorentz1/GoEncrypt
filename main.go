@@ -8,29 +8,33 @@ import (
 )
 
 type FileData struct {
-	filename string
-	password string
-	fileUUID uuid.UUID
-	bytes    []byte
+	filename    string
+	password    string
+	fileUUID    uuid.UUID
+	bytes       []byte
+	counter     int32
+	isLastChunk bool
 }
 
 type EncryptedFileData struct {
-	filename string
-	password string
-	fileUUID uuid.UUID
-	bytes    []byte
+	filename    string
+	password    string
+	fileUUID    uuid.UUID
+	bytes       []byte
+	counter     int32
+	isLastChunk bool
 }
 
 func main() {
 	var wg sync.WaitGroup
 	router := mux.NewRouter()
+	s3Context := InitializeS3Client()
 	fileChannel := make(chan FileData, 10)
 	encryptedFileChannel := make(chan EncryptedFileData, 10)
-	encryptedDataRepository := make(map[string]EncryptedFileData, 10)
 	plainDataRepository := make(map[string]FileData, 10)
 
-	declareRoutes(router, fileChannel, encryptedFileChannel, encryptedDataRepository, plainDataRepository)
-	initializeEncryptionWorkers(&wg, fileChannel, encryptedDataRepository)
+	declareRoutes(router, fileChannel, encryptedFileChannel, &s3Context, plainDataRepository)
+	initializeEncryptionWorkers(&wg, fileChannel, &s3Context)
 	initializeDecryptionWorkers(&wg, encryptedFileChannel, plainDataRepository)
 
 	errListenAndServe := http.ListenAndServe(":5678", router)
@@ -49,16 +53,15 @@ func initializeDecryptionWorkers(wg *sync.WaitGroup, encryptedFileChannel chan E
 	}
 }
 
-func initializeEncryptionWorkers(wg *sync.WaitGroup, fileChannel chan FileData,
-	encryptedDataRepository map[string]EncryptedFileData) {
+func initializeEncryptionWorkers(wg *sync.WaitGroup, fileChannel chan FileData, s3Context *S3Context) {
 	for range 5 {
 		wg.Add(1)
-		go EncryptFile(fileChannel, encryptedDataRepository)
+		go EncryptFile(fileChannel, s3Context)
 	}
 }
 
 func declareRoutes(router *mux.Router, fileChannel chan FileData, encryptedFileChannel chan EncryptedFileData,
-	encryptedDataRepository map[string]EncryptedFileData, plainDataRepository map[string]FileData) {
+	s3Context *S3Context, plainDataRepository map[string]FileData) {
 
 	router.HandleFunc("/encrypt", func(writer http.ResponseWriter, request *http.Request) {
 		HandlePlainFileUpload(writer, request, fileChannel)
@@ -70,7 +73,7 @@ func declareRoutes(router *mux.Router, fileChannel chan FileData, encryptedFileC
 
 	router.HandleFunc("/download/encrypted/{uuid}", func(writer http.ResponseWriter, request *http.Request) {
 		uuidFromRequest := mux.Vars(request)["uuid"]
-		HandleEncryptedDownload(writer, request, encryptedDataRepository, uuidFromRequest)
+		HandleEncryptedDownload(writer, request, s3Context, uuidFromRequest)
 	})
 
 	router.HandleFunc("/download/decrypted/{uuid}", func(writer http.ResponseWriter, request *http.Request) {
