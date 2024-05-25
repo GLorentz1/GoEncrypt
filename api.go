@@ -16,20 +16,17 @@ func HandleEncryptedDownload(w http.ResponseWriter, req *http.Request, repositor
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 
-	//data := repository[id]
-	//if data.bytes == nil {
-	//	w.WriteHeader(http.StatusAccepted)
-	//} else {
-	//	w.Header().Set("Content-Type", "application/octet-stream")
-	//	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", "encrypted_"+data.filename+".enc"))
-	//	w.WriteHeader(http.StatusOK)
-	//	_, err := w.Write(data.bytes)
-	//
-	//	if err != nil {
-	//		http.Error(w, "Error writing encrypted file to response writer", http.StatusInternalServerError)
-	//	}
-	//}
+	url := GetPresignedUrl(repository, id)
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	encoder := json.NewEncoder(w)
+	data := map[string]string{"downloadUrl": url}
+	errorJsonWrite := encoder.Encode(data)
+
+	if errorJsonWrite != nil {
+		http.Error(w, "Error writing presigned url to response writer", http.StatusInternalServerError)
+	}
 }
 
 func HandlePlainDownload(w http.ResponseWriter, req *http.Request, repository map[string]FileData, id string) {

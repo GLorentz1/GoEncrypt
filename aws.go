@@ -5,12 +5,14 @@ import (
 	"context"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"log"
 	"sort"
 	"sync"
+	"time"
 )
 
 type UploadInfo struct {
@@ -21,8 +23,13 @@ type UploadInfo struct {
 
 type S3Context struct {
 	service              *s3.Client
+	presignClient        *Presigner
 	fileUploadRepository map[string]*UploadInfo
 	mu                   sync.Mutex
+}
+
+type Presigner struct {
+	PresignClient *s3.PresignClient
 }
 
 func InitializeS3Client() S3Context {
@@ -33,7 +40,8 @@ func InitializeS3Client() S3Context {
 
 	svc := s3.NewFromConfig(cfg)
 
-	return S3Context{service: svc, fileUploadRepository: make(map[string]*UploadInfo)}
+	return S3Context{service: svc, presignClient: &Presigner{s3.NewPresignClient(svc)},
+		fileUploadRepository: make(map[string]*UploadInfo)}
 }
 
 func UploadPart(s3Context *S3Context, data EncryptedFileData) {
@@ -143,4 +151,27 @@ func completeMultipartUpload(client *s3.Client, key string, info *UploadInfo) er
 		return fmt.Errorf("failed to complete multipart upload: %v", err)
 	}
 	return nil
+}
+
+func (presigner Presigner) presignedGetRequest(id string) (*v4.PresignedHTTPRequest, error) {
+	request, err := presigner.PresignClient.PresignGetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String("goencrypt"),
+		Key:    aws.String(id),
+	}, func(opts *s3.PresignOptions) {
+		opts.Expires = time.Duration(3600 * int64(time.Second))
+	})
+	if err != nil {
+		log.Printf("Couldn't get a presigned request to get %v:%v. Here's why: %v\n", "goencrypt", id, err)
+	}
+	return request, err
+}
+
+func GetPresignedUrl(s3Context *S3Context, id string) string {
+	request, err := s3Context.presignClient.presignedGetRequest(id)
+
+	if err != nil {
+		log.Printf("Failed to get presigned url for id %d", id)
+	}
+
+	return request.URL
 }
