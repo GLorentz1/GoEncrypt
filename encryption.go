@@ -9,7 +9,7 @@ import (
 	"io"
 )
 
-func EncryptFile(fileDataChannel chan FileData, s3Context *S3Context) {
+func Encrypt(fileDataChannel chan FileData, s3Context *S3Context) {
 
 	for fileData := range fileDataChannel {
 		salt := make([]byte, 16)
@@ -48,32 +48,28 @@ func EncryptFile(fileDataChannel chan FileData, s3Context *S3Context) {
 
 }
 
-func DecryptFile(encryptedFileChannel chan EncryptedFileData, repository map[string]FileData) {
-	for encryptedFile := range encryptedFileChannel {
-		ciphertext := encryptedFile.bytes
-		salt := ciphertext[:16]
+func Decrypt(chunk []byte, password string) ([]byte, error) {
+	salt := chunk[:16]
 
-		key := pbkdf2.Key([]byte(encryptedFile.password), salt, 2048, 32, sha256.New)
+	key := pbkdf2.Key([]byte(password), salt, 2048, 32, sha256.New)
 
-		block, err := aes.NewCipher(key)
-		if err != nil {
-			continue
-		}
-
-		aesGCM, err := cipher.NewGCM(block)
-		if err != nil {
-			continue
-		}
-
-		nonceSize := aesGCM.NonceSize()
-		nonce, ciphertext := ciphertext[16:16+nonceSize], ciphertext[16+nonceSize:]
-
-		originalBytes, err := aesGCM.Open(nil, nonce, ciphertext, nil)
-		if err != nil {
-			continue
-		}
-
-		repository[encryptedFile.fileUUID.String()] =
-			FileData{filename: encryptedFile.filename, fileUUID: encryptedFile.fileUUID, bytes: originalBytes}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
 	}
+
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonceSize := aesGCM.NonceSize()
+	nonce, ciphertext := chunk[16:16+nonceSize], chunk[16+nonceSize:]
+
+	originalBytes, err := aesGCM.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return originalBytes, nil
 }

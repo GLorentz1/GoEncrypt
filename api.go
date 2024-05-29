@@ -2,13 +2,11 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/google/uuid"
 	"io"
 	"log"
 	"mime/multipart"
 	"net/http"
-	"strings"
 )
 
 func HandleEncryptedDownload(w http.ResponseWriter, req *http.Request, repository *S3Context, id string) {
@@ -29,24 +27,42 @@ func HandleEncryptedDownload(w http.ResponseWriter, req *http.Request, repositor
 	}
 }
 
-func HandlePlainDownload(w http.ResponseWriter, req *http.Request, repository map[string]FileData, id string) {
+func HandlePlainDownload(w http.ResponseWriter, req *http.Request, s3Context *S3Context, id string) {
 	if req.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 
-	data := repository[id]
-	if data.bytes == nil {
-		w.WriteHeader(http.StatusAccepted)
-	} else {
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", strings.TrimSuffix(data.filename, ".enc")))
-		w.WriteHeader(http.StatusOK)
-		_, err := w.Write(data.bytes)
+	const bufferLimit = 5*1024*1024 + 44 // max buffer size per upload to S3
+	var start int64 = 0
+	password := req.FormValue("password")
+
+	for {
+		chunk, err := DownloadChunk(s3Context.service, id, start, start+bufferLimit-1)
 
 		if err != nil {
-			http.Error(w, "Error writing plain file to response writer", http.StatusInternalServerError)
+			log.Printf("Failed to download chunk from S3: %v", err)
 		}
-	}
 
+		bytes, err := Decrypt(chunk, password)
+		if err != nil {
+			log.Printf("Failed to decrypt chunk: %v", err)
+		}
+
+		_, errWrite := w.Write(bytes)
+		if errWrite != nil {
+			log.Printf("Failed to write to response writer")
+		}
+
+		if len(chunk) < bufferLimit-1 {
+			log.Printf("Finished writing to response writer. len(bytes)={%d} < {%d}", len(chunk), bufferLimit-1)
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
+			break
+		}
+
+		start += bufferLimit
+	}
 }
 
 func HandleEncryptedFileUpload(writer http.ResponseWriter, request *http.Request, encryptedFileChannel chan EncryptedFileData) {
@@ -128,8 +144,11 @@ func HandlePlainFileUpload(writer http.ResponseWriter, request *http.Request, fi
 
 		log.Printf("Sending chunk %d with n {%d} bytes", counter, n)
 
+		data := make([]byte, n)
+		copy(data, buffer[:n])
+
 		fileChannel <- FileData{filename: handler.Filename, password: password, fileUUID: fileUUID,
-			bytes: buffer[:n], isLastChunk: err == io.EOF || n < bufferLimit, counter: counter}
+			bytes: data, isLastChunk: err == io.EOF || n < bufferLimit, counter: counter}
 
 		if err == io.EOF || n < bufferLimit {
 			log.Printf("Found EOF when counter was %d", counter)

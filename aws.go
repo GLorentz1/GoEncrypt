@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"io"
 	"log"
 	"sort"
 	"sync"
@@ -106,7 +107,7 @@ func startMultipartUpload(client *s3.Client, key string) (string, error) {
 func uploadChunk(s3Context *S3Context, key string, info *UploadInfo, data []byte, part int32) error {
 	ctx := context.TODO()
 
-	fmt.Printf("Uploading chunk with partNumber %d and upload id %s\n", part, info.UploadID)
+	fmt.Printf("Uploading chunk with partNumber %d and {%d} bytes\n", part, len(data))
 
 	uploadPartOutput, err := s3Context.service.UploadPart(ctx, &s3.UploadPartInput{
 		Bucket:     aws.String("goencrypt"),
@@ -138,6 +139,10 @@ func completeMultipartUpload(client *s3.Client, key string, info *UploadInfo) er
 	sort.Slice(info.Parts, func(i, j int) bool {
 		return *info.Parts[i].PartNumber < *info.Parts[j].PartNumber
 	})
+
+	for _, part := range info.Parts {
+		log.Printf("This is a part with number %d", *part.PartNumber)
+	}
 
 	_, err := client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
 		Bucket:   aws.String("goencrypt"),
@@ -174,4 +179,29 @@ func GetPresignedUrl(s3Context *S3Context, id string) string {
 	}
 
 	return request.URL
+}
+
+func DownloadChunk(client *s3.Client, key string, start, end int64) ([]byte, error) {
+	log.Printf("Received a DownloadChunk request with start={%d} and end={%d}", start, end)
+	rangeHeader := fmt.Sprintf("bytes=%d-%d", start, end)
+
+	output, err := client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String("goencrypt"),
+		Key:    aws.String(key),
+		Range:  aws.String(rangeHeader),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to download chunk: %w", err)
+	}
+	defer output.Body.Close()
+
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, output.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read chunk: %w", err)
+	}
+
+	log.Printf("Returning a buffer with %d bytes", len(buf.Bytes()))
+
+	return buf.Bytes(), nil
 }
