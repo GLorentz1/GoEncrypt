@@ -45,7 +45,7 @@ func InitializeS3Client() S3Context {
 		fileUploadRepository: make(map[string]*UploadInfo)}
 }
 
-func UploadPart(s3Context *S3Context, data EncryptedFileData) {
+func UploadPart(s3Context *S3Context, data FileData) {
 	s3Key := data.fileUUID.String()
 
 	s3Context.mu.Lock()

@@ -3,8 +3,8 @@ package main
 import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"log"
 	"net/http"
-	"sync"
 )
 
 type FileData struct {
@@ -16,36 +16,33 @@ type FileData struct {
 	isLastChunk bool
 }
 
-type EncryptedFileData struct {
-	filename    string
-	password    string
-	fileUUID    uuid.UUID
-	bytes       []byte
-	counter     int32
-	isLastChunk bool
-}
-
 func main() {
-	var wg sync.WaitGroup
 	router := mux.NewRouter()
 	s3Context := InitializeS3Client()
 	fileChannel := make(chan FileData, 10)
+	encryptedFileChannel := make(chan FileData, 10)
 
 	declareRoutes(router, fileChannel, &s3Context)
-	initializeEncryptionWorkers(&wg, fileChannel, &s3Context)
+	go func() {
+		errListenAndServe := http.ListenAndServe(":5678", router)
+		if errListenAndServe != nil {
+			panic(errListenAndServe)
+		}
+	}()
 
-	errListenAndServe := http.ListenAndServe(":5678", router)
-	if errListenAndServe != nil {
-		panic(errListenAndServe)
-	}
-
-	wg.Wait()
-}
-
-func initializeEncryptionWorkers(wg *sync.WaitGroup, fileChannel chan FileData, s3Context *S3Context) {
-	for range 5 {
-		wg.Add(1)
-		go Encrypt(fileChannel, s3Context)
+	for {
+		select {
+		case fileData := <-fileChannel:
+			func() {
+				log.Printf("Calling encryption go routine")
+				go Encrypt(fileData, encryptedFileChannel)
+			}()
+		case encryptedFileData := <-encryptedFileChannel:
+			func() {
+				log.Printf("Calling upload go routine")
+				go UploadPart(&s3Context, encryptedFileData)
+			}()
+		}
 	}
 }
 

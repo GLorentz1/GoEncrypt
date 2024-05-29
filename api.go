@@ -65,7 +65,7 @@ func HandlePlainDownload(w http.ResponseWriter, req *http.Request, s3Context *S3
 	}
 }
 
-func HandleEncryptedFileUpload(writer http.ResponseWriter, request *http.Request, encryptedFileChannel chan EncryptedFileData) {
+func HandleEncryptedFileUpload(writer http.ResponseWriter, request *http.Request, encryptedFileChannel chan FileData) {
 	if request.Method != http.MethodPost {
 		http.Error(writer, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -94,7 +94,7 @@ func HandleEncryptedFileUpload(writer http.ResponseWriter, request *http.Request
 	fileUUID := uuid.New()
 
 	password := request.FormValue("password")
-	encryptedFileChannel <- EncryptedFileData{filename: handler.Filename, password: password, fileUUID: fileUUID, bytes: fileBytes}
+	encryptedFileChannel <- FileData{filename: handler.Filename, password: password, fileUUID: fileUUID, bytes: fileBytes}
 
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
