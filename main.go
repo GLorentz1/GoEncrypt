@@ -57,8 +57,12 @@ func declareRoutes(router *mux.Router, fileChannel chan FileData, s3Context *S3C
 		HandleEncryptedDownload(writer, request, s3Context, uuidFromRequest)
 	})
 
-	router.HandleFunc("/download/decrypted/{uuid}", func(writer http.ResponseWriter, request *http.Request) {
+	router.HandleFunc("/decrypt/{uuid}", func(writer http.ResponseWriter, request *http.Request) {
 		uuidFromRequest := mux.Vars(request)["uuid"]
 		HandlePlainDownload(writer, request, s3Context, uuidFromRequest)
+	})
+
+	router.HandleFunc("/decrypt", func(writer http.ResponseWriter, request *http.Request) {
+		HandleEncryptedFileUpload(writer, request)
 	})
 }

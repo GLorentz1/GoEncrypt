@@ -112,7 +112,7 @@ func HandlePlainDownload(w http.ResponseWriter, req *http.Request, s3Context *S3
 	}
 }
 
-func HandleEncryptedFileUpload(writer http.ResponseWriter, request *http.Request, encryptedFileChannel chan FileData) {
+func HandleEncryptedFileUpload(writer http.ResponseWriter, request *http.Request) {
 	if request.Method != http.MethodPost {
 		http.Error(writer, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -122,7 +122,7 @@ func HandleEncryptedFileUpload(writer http.ResponseWriter, request *http.Request
 		http.Error(writer, "Error parsing form", http.StatusBadRequest)
 	}
 
-	file, handler, errorFormFile := request.FormFile("uploadFile")
+	file, _, errorFormFile := request.FormFile("uploadFile")
 	if errorFormFile != nil {
 		http.Error(writer, "Error retrieving file", http.StatusBadRequest)
 	}
@@ -133,25 +133,42 @@ func HandleEncryptedFileUpload(writer http.ResponseWriter, request *http.Request
 		}
 	}(file)
 
-	fileBytes, errorReadBytes := io.ReadAll(file)
-	if errorReadBytes != nil {
-		http.Error(writer, "Error reading file bytes", http.StatusInternalServerError)
-	}
-
-	fileUUID := uuid.New()
-
+	const bufferLimit = 5*1024*1024 + 44 // max buffer size per upload to S3
 	password := request.FormValue("password")
-	encryptedFileChannel <- FileData{filename: handler.Filename, password: password, fileUUID: fileUUID, bytes: fileBytes}
+	buffer := make([]byte, bufferLimit)
 
-	writer.Header().Set("Content-Type", "application/json")
-	writer.WriteHeader(http.StatusOK)
-	encoder := json.NewEncoder(writer)
-	data := map[string]uuid.UUID{"id": fileUUID}
-	errorJsonWrite := encoder.Encode(data)
+	for {
+		n, errorReadBytes := file.Read(buffer)
+		log.Printf("Read bytes from input! Size: %d", n)
+		if errorReadBytes != nil {
+			http.Error(writer, "Error reading file bytes", http.StatusInternalServerError)
+			break
+		}
 
-	if errorJsonWrite != nil {
-		http.Error(writer, "Error writing JSON response", http.StatusInternalServerError)
+		decrypted, errDecrypt := Decrypt(buffer[:n], password)
+
+		if errDecrypt != nil {
+			http.Error(writer, "Error decrypting file", http.StatusInternalServerError)
+			break
+		}
+
+		log.Printf("Writing decrypted buffer! Size: %d", len(decrypted))
+		_, err := writer.Write(decrypted)
+		if err != nil {
+			http.Error(writer, "Failed to write decrypted bytes", http.StatusInternalServerError)
+			break
+		}
+
+		if errorReadBytes == io.EOF || n < bufferLimit {
+			if flusher, ok := writer.(http.Flusher); ok {
+				log.Printf("Flushing!")
+				flusher.Flush()
+			}
+			log.Printf("Found EOF, finishing reading encrypted upload!")
+			break
+		}
 	}
+
 }
 
 func HandlePlainFileUpload(writer http.ResponseWriter, request *http.Request, fileChannel chan FileData) {
@@ -176,10 +193,9 @@ func HandlePlainFileUpload(writer http.ResponseWriter, request *http.Request, fi
 	}(file)
 
 	const bufferLimit = 5 * 1024 * 1024
-	bufferSize := bufferLimit
 	fileUUID := uuid.New()
 	password := request.FormValue("password")
-	buffer := make([]byte, bufferSize)
+	buffer := make([]byte, bufferLimit)
 	var counter int32 = 1
 
 	for {
