@@ -23,7 +23,7 @@ type UploadInfo struct {
 }
 
 type S3Context struct {
-	service              *s3.Client
+	client               *s3.Client
 	presignClient        *Presigner
 	fileUploadRepository map[string]*UploadInfo
 	mu                   sync.Mutex
@@ -41,7 +41,7 @@ func InitializeS3Client() S3Context {
 
 	svc := s3.NewFromConfig(cfg)
 
-	return S3Context{service: svc, presignClient: &Presigner{s3.NewPresignClient(svc)},
+	return S3Context{client: svc, presignClient: &Presigner{s3.NewPresignClient(svc)},
 		fileUploadRepository: make(map[string]*UploadInfo)}
 }
 
@@ -52,7 +52,7 @@ func UploadPart(s3Context *S3Context, data FileData) {
 	info, exists := s3Context.fileUploadRepository[s3Key]
 
 	if !exists {
-		uploadId, err := startMultipartUpload(s3Context.service, s3Key)
+		uploadId, err := startMultipartUpload(s3Context.client, s3Key)
 
 		if err != nil {
 			log.Printf("failed to start multipart upload for file %s: %v", s3Key, err)
@@ -78,7 +78,7 @@ func UploadPart(s3Context *S3Context, data FileData) {
 
 		if data.isLastChunk {
 			info.wg.Wait()
-			err := completeMultipartUpload(s3Context.service, s3Key, s3Context.fileUploadRepository[data.fileUUID.String()])
+			err := completeMultipartUpload(s3Context.client, s3Key, s3Context.fileUploadRepository[data.fileUUID.String()])
 			if err != nil {
 				log.Printf("failed to complete multipart upload for file %s", s3Key)
 				log.Printf("%v", err)
@@ -109,7 +109,7 @@ func uploadChunk(s3Context *S3Context, key string, info *UploadInfo, data []byte
 
 	fmt.Printf("Uploading chunk with partNumber %d and {%d} bytes\n", part, len(data))
 
-	uploadPartOutput, err := s3Context.service.UploadPart(ctx, &s3.UploadPartInput{
+	uploadPartOutput, err := s3Context.client.UploadPart(ctx, &s3.UploadPartInput{
 		Bucket:     aws.String("goencrypt"),
 		Key:        aws.String(key),
 		PartNumber: &part,
@@ -179,6 +179,23 @@ func GetPresignedUrl(s3Context *S3Context, id string) string {
 	}
 
 	return request.URL
+}
+
+func HeadFile(client *s3.Client, key string) (int64, error) {
+	log.Printf("Heading file %s", key)
+
+	object, err := client.HeadObject(context.TODO(),
+		&s3.HeadObjectInput{Bucket: aws.String("goencrypt"), Key: aws.String(key)})
+
+	if err != nil {
+		log.Printf("Couldn't head file %s, error: %v", key, err)
+	}
+
+	if object != nil {
+		return *object.ContentLength, nil
+	}
+
+	return -1, err
 }
 
 func DownloadChunk(client *s3.Client, key string, start, end int64) ([]byte, error) {

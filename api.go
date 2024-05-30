@@ -5,9 +5,16 @@ import (
 	"github.com/google/uuid"
 	"io"
 	"log"
+	"math"
 	"mime/multipart"
 	"net/http"
+	"sync"
 )
+
+type Chunk struct {
+	index int64
+	data  []byte
+}
 
 func HandleEncryptedDownload(w http.ResponseWriter, req *http.Request, repository *S3Context, id string) {
 	if req.Method != http.MethodGet {
@@ -33,35 +40,75 @@ func HandlePlainDownload(w http.ResponseWriter, req *http.Request, s3Context *S3
 	}
 
 	const bufferLimit = 5*1024*1024 + 44 // max buffer size per upload to S3
-	var start int64 = 0
 	password := req.FormValue("password")
 
-	for {
-		chunk, err := DownloadChunk(s3Context.service, id, start, start+bufferLimit-1)
+	fileSize, err := HeadFile(s3Context.client, id)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-		if err != nil {
-			log.Printf("Failed to download chunk from S3: %v", err)
+	numChunks := int64(math.Ceil(float64(fileSize) / float64(bufferLimit)))
+	var writeToResponseIndex int64 = 0
+
+	downloadedChannel := make(chan Chunk, numChunks)
+	defer close(downloadedChannel)
+	decryptedChannel := make(chan Chunk, numChunks)
+	defer close(decryptedChannel)
+
+	for counter := range numChunks {
+		go func() {
+			log.Printf("Sending download request with counter={%d} (start={%d} and end={%d})", counter, bufferLimit*counter, (bufferLimit*counter)+bufferLimit-1)
+			chunk, errDownload := DownloadChunk(s3Context.client, id, bufferLimit*counter, (bufferLimit*counter)+bufferLimit-1)
+
+			if errDownload != nil {
+				log.Fatalf("Failed to download chunk from S3: %v", errDownload)
+			}
+
+			downloadedChannel <- Chunk{index: counter, data: chunk}
+		}()
+	}
+
+	chunkBuffer := make(map[int64][]byte)
+	var bufferMutex sync.Mutex
+
+	go func() {
+		for chunk := range downloadedChannel {
+			log.Printf("Found a chunk with index={%d}", chunk.index)
+			go func() {
+				bytes, err := Decrypt(chunk.data, password)
+				if err != nil {
+					log.Fatalf("Failed to decrypt chunk: %v", err)
+				}
+
+				decryptedChannel <- Chunk{index: chunk.index, data: bytes}
+			}()
 		}
+	}()
 
-		bytes, err := Decrypt(chunk, password)
-		if err != nil {
-			log.Printf("Failed to decrypt chunk: %v", err)
+	go func() {
+		for chunk := range decryptedChannel {
+			log.Printf("Found a decrypted chunk with index={%d}", chunk.index)
+			bufferMutex.Lock()
+			chunkBuffer[chunk.index] = chunk.data
+			bufferMutex.Unlock()
 		}
+	}()
 
-		_, errWrite := w.Write(bytes)
-		if errWrite != nil {
-			log.Printf("Failed to write to response writer")
-		}
-
-		if len(chunk) < bufferLimit-1 {
-			log.Printf("Finished writing to response writer. len(bytes)={%d} < {%d}", len(chunk), bufferLimit-1)
+	for writeToResponseIndex < numChunks {
+		bufferMutex.Lock()
+		if data, ok := chunkBuffer[writeToResponseIndex]; ok {
+			_, err := w.Write(data)
+			if err != nil {
+				log.Fatalf("Failed to write to response writer: %v", err)
+			}
 			if flusher, ok := w.(http.Flusher); ok {
+				log.Printf("Flushing!")
 				flusher.Flush()
 			}
-			break
+			delete(chunkBuffer, writeToResponseIndex)
+			writeToResponseIndex++
 		}
-
-		start += bufferLimit
+		bufferMutex.Unlock()
 	}
 }
 
