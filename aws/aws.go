@@ -1,6 +1,7 @@
-package main
+package aws
 
 import (
+	myTypes "GoEncryptApi/types"
 	"bytes"
 	"context"
 	"fmt"
@@ -23,9 +24,9 @@ type UploadInfo struct {
 }
 
 type S3Context struct {
-	client               *s3.Client
-	presignClient        *Presigner
-	fileUploadRepository map[string]*UploadInfo
+	Client               *s3.Client
+	PresignClient        *Presigner
+	FileUploadRepository map[string]*UploadInfo
 	mu                   sync.Mutex
 }
 
@@ -41,18 +42,18 @@ func InitializeS3Client() S3Context {
 
 	svc := s3.NewFromConfig(cfg)
 
-	return S3Context{client: svc, presignClient: &Presigner{s3.NewPresignClient(svc)},
-		fileUploadRepository: make(map[string]*UploadInfo)}
+	return S3Context{Client: svc, PresignClient: &Presigner{s3.NewPresignClient(svc)},
+		FileUploadRepository: make(map[string]*UploadInfo)}
 }
 
-func UploadPart(s3Context *S3Context, data FileData) {
-	s3Key := data.fileUUID.String()
+func UploadPart(s3Context *S3Context, data myTypes.FileData) {
+	s3Key := data.FileUUID.String()
 
 	s3Context.mu.Lock()
-	info, exists := s3Context.fileUploadRepository[s3Key]
+	info, exists := s3Context.FileUploadRepository[s3Key]
 
 	if !exists {
-		uploadId, err := startMultipartUpload(s3Context.client, s3Key)
+		uploadId, err := startMultipartUpload(s3Context.Client, s3Key)
 
 		if err != nil {
 			log.Printf("failed to start multipart upload for file %s: %v", s3Key, err)
@@ -65,7 +66,7 @@ func UploadPart(s3Context *S3Context, data FileData) {
 			Parts:    make([]types.CompletedPart, 0),
 		}
 
-		s3Context.fileUploadRepository[data.fileUUID.String()] = info
+		s3Context.FileUploadRepository[data.FileUUID.String()] = info
 		fmt.Printf("Starting multipart upload with id %s\n", info.UploadID)
 	} else {
 		fmt.Printf("Continuing multipart upload with id %s\n", info.UploadID)
@@ -74,17 +75,17 @@ func UploadPart(s3Context *S3Context, data FileData) {
 
 	info.wg.Add(1)
 	go func() {
-		_ = uploadChunk(s3Context, s3Key, s3Context.fileUploadRepository[data.fileUUID.String()], data.bytes, data.counter)
+		_ = uploadChunk(s3Context, s3Key, s3Context.FileUploadRepository[data.FileUUID.String()], data.Bytes, data.Counter)
 
-		if data.isLastChunk {
+		if data.IsLastChunk {
 			info.wg.Wait()
-			err := completeMultipartUpload(s3Context.client, s3Key, s3Context.fileUploadRepository[data.fileUUID.String()])
+			err := completeMultipartUpload(s3Context.Client, s3Key, s3Context.FileUploadRepository[data.FileUUID.String()])
 			if err != nil {
 				log.Printf("failed to complete multipart upload for file %s", s3Key)
 				log.Printf("%v", err)
 			} else {
 				s3Context.mu.Lock()
-				delete(s3Context.fileUploadRepository, s3Key)
+				delete(s3Context.FileUploadRepository, s3Key)
 				s3Context.mu.Unlock()
 				log.Printf("Successfully finished multipart upload for file %s", s3Key)
 			}
@@ -109,7 +110,7 @@ func uploadChunk(s3Context *S3Context, key string, info *UploadInfo, data []byte
 
 	fmt.Printf("Uploading chunk with partNumber %d and {%d} bytes\n", part, len(data))
 
-	uploadPartOutput, err := s3Context.client.UploadPart(ctx, &s3.UploadPartInput{
+	uploadPartOutput, err := s3Context.Client.UploadPart(ctx, &s3.UploadPartInput{
 		Bucket:     aws.String("goencrypt"),
 		Key:        aws.String(key),
 		PartNumber: &part,
@@ -172,7 +173,7 @@ func (presigner Presigner) presignedGetRequest(id string) (*v4.PresignedHTTPRequ
 }
 
 func GetPresignedUrl(s3Context *S3Context, id string) string {
-	request, err := s3Context.presignClient.presignedGetRequest(id)
+	request, err := s3Context.PresignClient.presignedGetRequest(id)
 
 	if err != nil {
 		log.Printf("Failed to get presigned url for id %d", id)

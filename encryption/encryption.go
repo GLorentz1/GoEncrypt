@@ -1,6 +1,7 @@
-package main
+package encryption
 
 import (
+	"GoEncryptApi/types"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -9,7 +10,7 @@ import (
 	"io"
 )
 
-func Encrypt(fileData FileData, encryptedFileChannel chan FileData) {
+func Encrypt(fileData types.FileData, encryptedFileChannel chan types.FileData) {
 
 	salt := make([]byte, 16)
 	_, err := io.ReadFull(rand.Reader, salt)
@@ -18,7 +19,7 @@ func Encrypt(fileData FileData, encryptedFileChannel chan FileData) {
 		return
 	}
 
-	key := pbkdf2.Key([]byte(fileData.password), salt, 2048, 32, sha256.New)
+	key := pbkdf2.Key([]byte(fileData.Password), salt, 2048, 32, sha256.New)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -36,11 +37,11 @@ func Encrypt(fileData FileData, encryptedFileChannel chan FileData) {
 		return
 	}
 
-	ciphertext := aesGCM.Seal(nonce, nonce, fileData.bytes, nil)
+	ciphertext := aesGCM.Seal(nonce, nonce, fileData.Bytes, nil)
 	ciphertext = append(salt, ciphertext...)
 
-	encryptedData := FileData{filename: fileData.filename, fileUUID: fileData.fileUUID,
-		bytes: ciphertext, isLastChunk: fileData.isLastChunk, counter: fileData.counter}
+	encryptedData := types.FileData{Filename: fileData.Filename, FileUUID: fileData.FileUUID,
+		Bytes: ciphertext, IsLastChunk: fileData.IsLastChunk, Counter: fileData.Counter}
 
 	encryptedFileChannel <- encryptedData
 }

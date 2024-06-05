@@ -1,0 +1,122 @@
+package views
+
+templ Home() {
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>GoEncrypt - Secure Your Data</title>
+        <link rel="stylesheet" href="/public/styles.css">
+    </head>
+    <body>
+        <header>
+            <h1>Welcome to GoEncrypt</h1>
+            <nav>
+                <ul>
+                    <li><a href="/">Home</a></li>
+                </ul>
+            </nav>
+        </header>
+
+        <main>
+            <section>
+                <h2>Encrypt Your Data with Ease</h2>
+                <p>GoEncrypt provides you with secure encryption for all your data. Use our tool to encrypt and decrypt your files securely.</p>
+            </section>
+
+            <section>
+                <h2>Encrypt a File</h2>
+                <form id="encryptForm" method="post" action="/encrypt" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-post="/encrypt">
+                    <div>
+                        <label for="uploadFile">Select file to encrypt:</label>
+                        <input type="file" id="uploadFile" name="uploadFile" required>
+                    </div>
+                    <div>
+                        <label for="password">Enter password:</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    <button type="submit">Encrypt</button>
+                </form>
+            </section>
+
+            <section>
+                <h2>Decrypt a File</h2>
+                <form id="decryptForm" method="post" action="/decrypt" enctype="multipart/form-data">
+                    <div>
+                        <label for="uploadFileDecrypt">Select encrypted file:</label>
+                        <input type="file" id="uploadFileDecrypt" name="uploadFile" required>
+                    </div>
+                    <div>
+                        <label for="decryptPassword">Enter password:</label>
+                        <input type="password" id="decryptPassword" name="password" required>
+                    </div>
+                    <button type="submit">Decrypt</button>
+                </form>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2024 GoEncrypt. All rights reserved.</p>
+        </footer>
+
+        <!-- HTMX library -->
+        <script src="https://unpkg.com/htmx.org@1.7.0"></script>
+
+        <!-- Custom script to handle file download -->
+        <script>
+            document.getElementById('decryptForm').addEventListener('submit', function(event) {
+                event.preventDefault();
+                const formData = new FormData(this);
+
+                fetch('/decrypt', {
+                    method: 'POST',
+                    body: formData
+                }).then(response => {
+                    if (response.ok) {
+                        const contentDisposition = response.headers.get('Content-Disposition');
+                        let filename = 'decrypted-file';
+                        if (contentDisposition) {
+                            const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                            if (filenameMatch && filenameMatch.length === 2) {
+                                filename = filenameMatch[1];
+                            }
+                        }
+
+                        const reader = response.body.getReader();
+                        const stream = new ReadableStream({
+                            start(controller) {
+                                function push() {
+                                    reader.read().then(({ done, value }) => {
+                                        if (done) {
+                                            controller.close();
+                                            return;
+                                        }
+                                        controller.enqueue(value);
+                                        push();
+                                    });
+                                }
+                                push();
+                            }
+                        });
+
+                        return new Response(stream).blob().then(blob => {
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = filename;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        });
+                    } else {
+                        console.error('Decryption failed:', response.statusText);
+                    }
+                }).catch(error => {
+                    console.error('Error:', error);
+                });
+            });
+        </script>
+    </body>
+    </html>
+}

@@ -1,6 +1,10 @@
-package main
+package handlers
 
 import (
+	"GoEncryptApi/aws"
+	"GoEncryptApi/encryption"
+	"GoEncryptApi/types"
+	"GoEncryptApi/views"
 	"encoding/json"
 	"github.com/google/uuid"
 	"io"
@@ -16,12 +20,19 @@ type Chunk struct {
 	data  []byte
 }
 
-func HandleEncryptedDownload(w http.ResponseWriter, req *http.Request, repository *S3Context, id string) {
+func HandleHome(w http.ResponseWriter, req *http.Request) {
+	err := views.Home().Render(req.Context(), w)
+	if err != nil {
+		log.Print(err)
+	}
+}
+
+func HandleEncryptedDownload(w http.ResponseWriter, req *http.Request, repository *aws.S3Context, id string) {
 	if req.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 
-	url := GetPresignedUrl(repository, id)
+	url := aws.GetPresignedUrl(repository, id)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -34,7 +45,7 @@ func HandleEncryptedDownload(w http.ResponseWriter, req *http.Request, repositor
 	}
 }
 
-func HandlePlainDownload(w http.ResponseWriter, req *http.Request, s3Context *S3Context, id string) {
+func HandlePlainDownload(w http.ResponseWriter, req *http.Request, s3Context *aws.S3Context, id string) {
 	if req.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -42,7 +53,7 @@ func HandlePlainDownload(w http.ResponseWriter, req *http.Request, s3Context *S3
 	const bufferLimit = 5*1024*1024 + 44 // max buffer size per upload to S3
 	password := req.FormValue("password")
 
-	fileSize, err := HeadFile(s3Context.client, id)
+	fileSize, err := aws.HeadFile(s3Context.Client, id)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -58,7 +69,7 @@ func HandlePlainDownload(w http.ResponseWriter, req *http.Request, s3Context *S3
 	for counter := range numChunks {
 		go func() {
 			log.Printf("Sending download request with counter={%d} (start={%d} and end={%d})", counter, bufferLimit*counter, (bufferLimit*counter)+bufferLimit-1)
-			chunk, errDownload := DownloadChunk(s3Context.client, id, bufferLimit*counter, (bufferLimit*counter)+bufferLimit-1)
+			chunk, errDownload := aws.DownloadChunk(s3Context.Client, id, bufferLimit*counter, (bufferLimit*counter)+bufferLimit-1)
 
 			if errDownload != nil {
 				log.Fatalf("Failed to download chunk from S3: %v", errDownload)
@@ -75,7 +86,7 @@ func HandlePlainDownload(w http.ResponseWriter, req *http.Request, s3Context *S3
 		for chunk := range downloadedChannel {
 			log.Printf("Found a chunk with index={%d}", chunk.index)
 			go func() {
-				bytes, err := Decrypt(chunk.data, password)
+				bytes, err := encryption.Decrypt(chunk.data, password)
 				if err != nil {
 					log.Fatalf("Failed to decrypt chunk: %v", err)
 				}
@@ -145,7 +156,7 @@ func HandleEncryptedFileUpload(writer http.ResponseWriter, request *http.Request
 			break
 		}
 
-		decrypted, errDecrypt := Decrypt(buffer[:n], password)
+		decrypted, errDecrypt := encryption.Decrypt(buffer[:n], password)
 
 		if errDecrypt != nil {
 			http.Error(writer, "Error decrypting file", http.StatusInternalServerError)
@@ -171,7 +182,7 @@ func HandleEncryptedFileUpload(writer http.ResponseWriter, request *http.Request
 
 }
 
-func HandlePlainFileUpload(writer http.ResponseWriter, request *http.Request, fileChannel chan FileData) {
+func HandlePlainFileUpload(writer http.ResponseWriter, request *http.Request, fileChannel chan types.FileData) {
 	if request.Method != http.MethodPost {
 		http.Error(writer, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -210,8 +221,8 @@ func HandlePlainFileUpload(writer http.ResponseWriter, request *http.Request, fi
 		data := make([]byte, n)
 		copy(data, buffer[:n])
 
-		fileChannel <- FileData{filename: handler.Filename, password: password, fileUUID: fileUUID,
-			bytes: data, isLastChunk: err == io.EOF || n < bufferLimit, counter: counter}
+		fileChannel <- types.FileData{Filename: handler.Filename, Password: password, FileUUID: fileUUID,
+			Bytes: data, IsLastChunk: err == io.EOF || n < bufferLimit, Counter: counter}
 
 		if err == io.EOF || n < bufferLimit {
 			log.Printf("Found EOF when counter was %d", counter)
