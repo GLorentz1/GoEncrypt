@@ -27,7 +27,7 @@ templ Home() {
 
             <section>
                 <h2>Encrypt a File</h2>
-                <form id="encryptForm" method="post" action="/encrypt" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-post="/encrypt">
+                <form id="encryptForm" method="post" action="/encrypt" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-post="/encrypt" hx-swap="afterend" hx-target="#encryptForm">
                     <div>
                         <label for="uploadFile">Select file to encrypt:</label>
                         <input type="file" id="uploadFile" name="uploadFile" required>

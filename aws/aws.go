@@ -172,14 +172,15 @@ func (presigner Presigner) presignedGetRequest(id string) (*v4.PresignedHTTPRequ
 	return request, err
 }
 
-func GetPresignedUrl(s3Context *S3Context, id string) string {
+func GetPresignedUrl(s3Context *S3Context, id string) (string, error) {
 	request, err := s3Context.PresignClient.presignedGetRequest(id)
 
 	if err != nil {
 		log.Printf("Failed to get presigned url for id %d", id)
+		return "", err
 	}
 
-	return request.URL
+	return request.URL, err
 }
 
 func HeadFile(client *s3.Client, key string) (int64, error) {

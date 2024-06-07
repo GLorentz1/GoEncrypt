@@ -5,7 +5,6 @@ import (
 	"GoEncryptApi/encryption"
 	"GoEncryptApi/types"
 	"GoEncryptApi/views"
-	"encoding/json"
 	"github.com/google/uuid"
 	"io"
 	"log"
@@ -32,17 +31,27 @@ func HandleEncryptedDownload(w http.ResponseWriter, req *http.Request, repositor
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 
-	url := aws.GetPresignedUrl(repository, id)
+	url, err := aws.GetPresignedUrl(repository, id)
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	encoder := json.NewEncoder(w)
-	data := map[string]string{"downloadUrl": url}
-	errorJsonWrite := encoder.Encode(data)
-
-	if errorJsonWrite != nil {
-		http.Error(w, "Error writing presigned url to response writer", http.StatusInternalServerError)
+	if err != nil {
+		http.Error(w, "Failed to get encrypted file download URL. "+
+			"If your id is correct, try again in a few minutes, your file is still being processed.",
+			http.StatusAccepted)
 	}
+
+	err = views.DownloadEncrypted(url).Render(req.Context(), w)
+	if err != nil {
+		log.Print(err)
+	}
+	//w.Header().Set("Content-Type", "application/json")
+	//w.WriteHeader(http.StatusOK)
+	//encoder := json.NewEncoder(w)
+	//data := map[string]string{"downloadUrl": url}
+	//errorJsonWrite := encoder.Encode(data)
+	//
+	//if errorJsonWrite != nil {
+	//	http.Error(w, "Error writing presigned url to response writer", http.StatusInternalServerError)
+	//}
 }
 
 func HandlePlainDownload(w http.ResponseWriter, req *http.Request, s3Context *aws.S3Context, id string) {
@@ -232,13 +241,18 @@ func HandlePlainFileUpload(writer http.ResponseWriter, request *http.Request, fi
 		counter += 1
 	}
 
-	writer.Header().Set("Content-Type", "application/json")
-	writer.WriteHeader(http.StatusOK)
-	encoder := json.NewEncoder(writer)
-	data := map[string]uuid.UUID{"id": fileUUID}
-	errorJsonWrite := encoder.Encode(data)
-
-	if errorJsonWrite != nil {
-		http.Error(writer, "Error writing JSON response", http.StatusInternalServerError)
+	err := views.Encrypted(fileUUID).Render(request.Context(), writer)
+	if err != nil {
+		log.Print(err)
 	}
+
+	//writer.Header().Set("Content-Type", "application/json")
+	//writer.WriteHeader(http.StatusOK)
+	//encoder := json.NewEncoder(writer)
+	//data := map[string]uuid.UUID{"id": fileUUID}
+	//errorJsonWrite := encoder.Encode(data)
+	//
+	//if errorJsonWrite != nil {
+	//	http.Error(writer, "Error writing JSON response", http.StatusInternalServerError)
+	//}
 }
