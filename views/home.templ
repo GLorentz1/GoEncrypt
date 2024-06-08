@@ -42,7 +42,7 @@ templ Home() {
 
             <section>
                 <h2>Decrypt a File</h2>
-                <form id="decryptForm" method="post" action="/decrypt" enctype="multipart/form-data">
+                <form id="decryptForm" method="post" action="/decrypt" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-post="/decrypt" hx-on="htmx:responseError:handleDecryptionError" hx-swap="none">
                     <div>
                         <label for="uploadFileDecrypt">Select encrypted file:</label>
                         <input type="file" id="uploadFileDecrypt" name="uploadFile" required>
@@ -53,6 +53,7 @@ templ Home() {
                     </div>
                     <button type="submit">Decrypt</button>
                 </form>
+                <div id="error-message" style="color: red;"></div>
             </section>
         </main>
 
@@ -63,7 +64,7 @@ templ Home() {
         <!-- HTMX library -->
         <script src="https://unpkg.com/htmx.org@1.7.0"></script>
 
-        <!-- Custom script to handle file download -->
+        <!-- Custom script to handle file download and error display -->
         <script>
             document.getElementById('decryptForm').addEventListener('submit', function(event) {
                 event.preventDefault();
@@ -74,6 +75,9 @@ templ Home() {
                     body: formData
                 }).then(response => {
                     if (response.ok) {
+                        var errorMessage = document.getElementById('error-message');
+                        errorMessage.textContent = '';
+
                         const contentDisposition = response.headers.get('Content-Disposition');
                         let filename = 'decrypted-file';
                         if (contentDisposition) {
@@ -110,11 +114,18 @@ templ Home() {
                             document.body.removeChild(link);
                         });
                     } else {
-                        console.error('Decryption failed:', response.statusText);
+                        var errorMessage = document.getElementById('error-message');
+                        errorMessage.textContent = 'Decryption failed: ' + response.statusText;
                     }
                 }).catch(error => {
-                    console.error('Error:', error);
+                    var errorMessage = document.getElementById('error-message');
+                    errorMessage.textContent = 'Error: ' + error;
                 });
+            });
+
+            document.body.addEventListener('htmx:responseError', function(evt) {
+                var errorMessage = document.getElementById('error-message');
+                errorMessage.textContent = 'Decryption failed: ' + evt.detail.xhr.statusText;
             });
         </script>
     </body>
