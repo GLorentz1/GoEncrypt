@@ -184,13 +184,12 @@ func GetPresignedUrl(s3Context *S3Context, id string) (string, error) {
 }
 
 func HeadFile(client *s3.Client, key string) (int64, error) {
-	log.Printf("Heading file %s", key)
-
 	object, err := client.HeadObject(context.TODO(),
 		&s3.HeadObjectInput{Bucket: aws.String("goencrypt"), Key: aws.String(key)})
 
 	if err != nil {
 		log.Printf("Couldn't head file %s, error: %v", key, err)
+		return -1, err
 	}
 
 	if object != nil {

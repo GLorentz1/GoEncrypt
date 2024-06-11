@@ -1,8 +1,18 @@
 package views
 
+import "GoEncryptApi/types"
 
-templ DownloadEncrypted(url string) {
-
-    <p>If the URL fails to be generated, wait a few seconds before trying again.</p>
-    <a id="downloadLink" href={templ.URL(url)} download="encrypted_file" style="color: #7652ba">Download encrypted file</a>
+templ DownloadEncrypted(url string, res types.Response) {
+    <html>
+            if res.Status != 200 {
+                <div>
+                    <p>Error: { res.Msg }</p>
+                </div>
+            } else {
+                <div>
+                    <p>Successfully generated download link:</p>
+                    <a id="downloadLink" href={templ.URL(url)} download="encrypted_file" style="color: #7652ba">Download encrypted file</a>
+                </div>
+            }
+        </html>
 }

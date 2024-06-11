@@ -28,30 +28,24 @@ func HandleHome(w http.ResponseWriter, req *http.Request) {
 
 func HandleEncryptedDownload(w http.ResponseWriter, req *http.Request, repository *aws.S3Context, id string) {
 	if req.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		views.DownloadEncrypted("", types.Response{Status: http.StatusMethodNotAllowed, Msg: "Method not allowed"}).Render(req.Context(), w)
+		return
+	}
+
+	_, err := aws.HeadFile(repository.Client, id)
+	if err != nil {
+		views.DownloadEncrypted("", types.Response{Status: http.StatusAccepted, Msg: "Your file is still being processed. Try again in a few minutes."}).Render(req.Context(), w)
+		return
 	}
 
 	url, err := aws.GetPresignedUrl(repository, id)
 
 	if err != nil {
-		http.Error(w, "Failed to get encrypted file download URL. "+
-			"If your id is correct, try again in a few minutes, your file is still being processed.",
-			http.StatusAccepted)
+		views.DownloadEncrypted("", types.Response{Status: http.StatusAccepted, Msg: "Your file is still being processed. Try again in a few minutes."}).Render(req.Context(), w)
+		return
 	}
 
-	err = views.DownloadEncrypted(url).Render(req.Context(), w)
-	if err != nil {
-		log.Print(err)
-	}
-	//w.Header().Set("Content-Type", "application/json")
-	//w.WriteHeader(http.StatusOK)
-	//encoder := json.NewEncoder(w)
-	//data := map[string]string{"downloadUrl": url}
-	//errorJsonWrite := encoder.Encode(data)
-	//
-	//if errorJsonWrite != nil {
-	//	http.Error(w, "Error writing presigned url to response writer", http.StatusInternalServerError)
-	//}
+	_ = views.DownloadEncrypted(url, types.Response{Status: http.StatusOK}).Render(req.Context(), w)
 }
 
 func HandlePlainDownload(w http.ResponseWriter, req *http.Request, s3Context *aws.S3Context, id string) {
