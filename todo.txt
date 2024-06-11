@@ -1,0 +1,5 @@
+- Need to cancel multipart uploads when upload is blocked by file limits or by error
+- Improve other endpoints error handling
+- Standardize error treatment in code (some places use log.fatal, others use log.print, others return http.errors)
+- Rate-limit requests somehow (maybe IP addresses?)
+- Head file before generating download link (that way we can check if the upload has finished)

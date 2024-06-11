@@ -193,28 +193,35 @@ func HandleEncryptedFileUpload(writer http.ResponseWriter, request *http.Request
 
 func HandlePlainFileUpload(writer http.ResponseWriter, request *http.Request, fileChannel chan types.FileData) {
 	if request.Method != http.MethodPost {
-		http.Error(writer, "Method not allowed", http.StatusMethodNotAllowed)
+		views.Encrypted(uuid.UUID{}, types.Response{Status: http.StatusMethodNotAllowed, Msg: "Method not allowed"}).Render(request.Context(), writer)
+		return
 	}
 
 	errorMultipart := request.ParseMultipartForm(16 << 20)
 	if errorMultipart != nil {
-		http.Error(writer, "Error parsing form", http.StatusBadRequest)
+		views.Encrypted(uuid.UUID{}, types.Response{Status: http.StatusBadRequest, Msg: "Error reading file"}).Render(request.Context(), writer)
+		return
 	}
 
 	file, handler, errorFormFile := request.FormFile("uploadFile")
 	if errorFormFile != nil {
-		http.Error(writer, "Error retrieving file", http.StatusBadRequest)
+		views.Encrypted(uuid.UUID{}, types.Response{Status: http.StatusBadRequest, Msg: "Error reading file"}).Render(request.Context(), writer)
+		return
 	}
 	defer func(file multipart.File) {
 		err := file.Close()
 		if err != nil {
-			http.Error(writer, "Error closing file", http.StatusInternalServerError)
+			views.Encrypted(uuid.UUID{}, types.Response{Status: http.StatusBadRequest, Msg: "Error reading file"}).Render(request.Context(), writer)
+			return
 		}
 	}(file)
 
 	const bufferLimit = 5 * 1024 * 1024
+	const sizeLimit = 64 * 1024 * 1024
+	var currentSize = 0
 	fileUUID := uuid.New()
 	password := request.FormValue("password")
+
 	buffer := make([]byte, bufferLimit)
 	var counter int32 = 1
 
@@ -222,10 +229,9 @@ func HandlePlainFileUpload(writer http.ResponseWriter, request *http.Request, fi
 		n, err := file.Read(buffer)
 
 		if err != nil && err != io.EOF {
-			http.Error(writer, "Error reading file", http.StatusInternalServerError)
+			views.Encrypted(uuid.UUID{}, types.Response{Status: http.StatusBadRequest, Msg: "Error reading file"}).Render(request.Context(), writer)
+			return
 		}
-
-		log.Printf("Sending chunk %d with n {%d} bytes", counter, n)
 
 		data := make([]byte, n)
 		copy(data, buffer[:n])
@@ -234,25 +240,19 @@ func HandlePlainFileUpload(writer http.ResponseWriter, request *http.Request, fi
 			Bytes: data, IsLastChunk: err == io.EOF || n < bufferLimit, Counter: counter}
 
 		if err == io.EOF || n < bufferLimit {
-			log.Printf("Found EOF when counter was %d", counter)
 			break
 		}
 
 		counter += 1
+		currentSize += n
+		if currentSize >= sizeLimit {
+			views.Encrypted(uuid.UUID{}, types.Response{Status: http.StatusBadRequest, Msg: "File is too big. Size limit: 64MB"}).Render(request.Context(), writer)
+			return
+		}
 	}
 
-	err := views.Encrypted(fileUUID).Render(request.Context(), writer)
+	err := views.Encrypted(fileUUID, types.Response{Status: http.StatusOK}).Render(request.Context(), writer)
 	if err != nil {
 		log.Print(err)
 	}
-
-	//writer.Header().Set("Content-Type", "application/json")
-	//writer.WriteHeader(http.StatusOK)
-	//encoder := json.NewEncoder(writer)
-	//data := map[string]uuid.UUID{"id": fileUUID}
-	//errorJsonWrite := encoder.Encode(data)
-	//
-	//if errorJsonWrite != nil {
-	//	http.Error(writer, "Error writing JSON response", http.StatusInternalServerError)
-	//}
 }

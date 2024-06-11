@@ -10,3 +10,8 @@ type FileData struct {
 	Counter     int32
 	IsLastChunk bool
 }
+
+type Response struct {
+	Status int
+	Msg    string
+}

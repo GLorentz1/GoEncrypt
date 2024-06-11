@@ -3,14 +3,21 @@ package views
 import (
         "github.com/google/uuid"
         "fmt"
+        "GoEncryptApi/types"
         )
 
-templ Encrypted(data uuid.UUID) {
+templ Encrypted(data uuid.UUID, res types.Response) {
     <html>
-        <div>
-            <p>If the button below fails, try again after some time.</p>
-            <button id="downloadButton"  hx-get={ fmt.Sprintf("/download/encrypted/%s", data.String()) }  hx-target="#downloadLink">Get Download URL for Encrypted File</button>
-            <a id="downloadLink"></a>
-        </div>
+        if res.Status != 200 {
+            <div>
+                <p>There was an error, please try again. Error: { res.Msg }</p>
+            </div>
+        } else {
+            <div>
+                <p>If the button below fails, try again after some time.</p>
+                <button id="downloadButton"  hx-get={ fmt.Sprintf("/download/encrypted/%s", data.String()) }  hx-target="#downloadLink">Get Download URL for Encrypted File</button>
+                <a id="downloadLink"></a>
+            </div>
+        }
     </html>
 }

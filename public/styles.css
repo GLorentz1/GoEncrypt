@@ -12,6 +12,7 @@ header {
     background-color: #7652ba;
     padding: 1rem;
     text-align: center;
+    margin-top: 1rem;
 }
 header h1 {
     margin: 0;
@@ -55,7 +56,6 @@ button {
     border: none;
     padding: 0.5rem 1rem;
     cursor: pointer;
-    margin-top: 1rem;
 }
 button:hover {
     background-color: #673fb5;

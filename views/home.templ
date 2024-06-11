@@ -23,7 +23,7 @@ templ Home() {
 
             <section>
                 <h2>Encrypt a File</h2>
-                <form id="encryptForm" method="post" action="/encrypt" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-post="/encrypt" hx-swap="afterend" hx-target="#encryptForm">
+                <form id="encryptForm" method="post" action="/encrypt" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-post="/encrypt" hx-target="#encryptionResponsePlaceholder">
                     <div>
                         <label for="uploadFile">Select file to encrypt:</label>
                         <input type="file" id="uploadFile" name="uploadFile" required>
@@ -31,7 +31,7 @@ templ Home() {
                         <input type="password" id="password" name="password" required>
                         <button type="submit">Encrypt</button>
                     </div>
-
+                    <div id="encryptionResponsePlaceholder"></div>
                 </form>
 
                 <h2>Decrypt a File</h2>
