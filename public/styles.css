@@ -9,7 +9,7 @@ body {
     min-height: 100vh;
 }
 header {
-    background-color: #8b0000;
+    background-color: #7652ba;
     padding: 1rem;
     text-align: center;
 }
@@ -44,13 +44,13 @@ section {
     max-width: 600px;
 }
 footer {
-    background-color: #8b0000;
+    background-color: #7652ba;
     text-align: center;
     padding: 1rem;
     margin-top: auto;
 }
 button {
-    background-color: #b22222;
+    background-color: #7652ba;
     color: #f4f4f4;
     border: none;
     padding: 0.5rem 1rem;
@@ -58,7 +58,7 @@ button {
     margin-top: 1rem;
 }
 button:hover {
-    background-color: #dc143c;
+    background-color: #673fb5;
 }
 input[type="file"], input[type="password"] {
     margin-bottom: 1rem;
@@ -80,11 +80,3 @@ form div {
     margin-top: 1rem;
 }
 
-#downloadLink {
-    background-color: #b22222;
-    color: #f4f4f4;
-    border: none;
-    padding: 0.5rem 1rem;
-    cursor: pointer;
-    margin-top: 1rem;
-}

@@ -8,9 +8,9 @@ import (
 templ Encrypted(data uuid.UUID) {
     <html>
         <div>
-            <p>Your file with id {data.String()} has been submitted. Click the button below to download the encrypted file. If the button fails, keep in mind that larger files may take longer to be processed, so you should try again after some time.</p>
+            <p>If the button below fails, try again after some time.</p>
+            <button id="downloadButton"  hx-get={ fmt.Sprintf("/download/encrypted/%s", data.String()) }  hx-target="#downloadLink">Get Download URL for Encrypted File</button>
+            <a id="downloadLink"></a>
         </div>
-        <button id="downloadButton"  hx-get={ fmt.Sprintf("/download/encrypted/%s", data.String()) }  hx-target="#downloadLink">Get Download URL for Encrypted File</button>
-        <a id="downloadLink"></a>
     </html>
 }
