@@ -10,8 +10,7 @@ templ DownloadEncrypted(url string, res types.Response) {
                 </div>
             } else {
                 <div>
-                    <p>Successfully generated download link:</p>
-                    <a id="downloadLink" href={templ.URL(url)} download="encrypted_file" style="color: #7652ba">Download encrypted file</a>
+                    <p>Successfully generated download link: <a id="downloadLink" href={templ.URL(url)} download="encrypted_file" style="color: #7652ba">Download encrypted file</a></p>
                 </div>
             }
         </html>

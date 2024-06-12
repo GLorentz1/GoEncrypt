@@ -40,12 +40,18 @@ templ Home() {
                 </form>
 
                 <h2>Decrypt a File</h2>
-                <form id="decryptForm" method="post" action="/decrypt" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-post="/decrypt" hx-on="htmx:responseError:handleDecryptionError" hx-swap="none">
+                <p style="font-size: smaller">Either upload the encrypted file or submit an id from a previous upload</p>
+                <form id="decryptForm" method="post" action="/decrypt" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-post="/decrypt" hx-swap="none">
                     <div>
-                        <label for="uploadFileDecrypt">Select encrypted file:</label>
-                        <input type="file" id="uploadFileDecrypt" name="uploadFile" required>
+                        <label for="uploadFileDecrypt">Select encrypted file (optional):</label>
+                        <input type="file" id="uploadFileDecrypt" name="uploadFile">
+
+                        <label for="fileId">Enter file id (optional):</label>
+                        <input type="text" id="fileId" name="fileId">
+
                         <label for="decryptPassword">Enter password:</label>
                         <input type="password" id="decryptPassword" name="password" required>
+
                         <button type="submit">Decrypt</button>
                     </div>
                 </form>
@@ -111,7 +117,7 @@ templ Home() {
                         });
                     } else {
                         var errorMessage = document.getElementById('error-message');
-                        errorMessage.textContent = 'Decryption failed: ' + response.statusText;
+                        errorMessage.textContent = 'Decryption failed: ' + response.text();
                     }
                 }).catch(error => {
                     var errorMessage = document.getElementById('error-message');

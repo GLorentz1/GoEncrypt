@@ -65,7 +65,7 @@ button {
 button:hover {
     background-color: #673fb5;
 }
-input[type="file"], input[type="password"] {
+input[type="file"], input[type="password"], input[type="text"]{
     margin-bottom: 1rem;
     width: calc(100% - 1rem);
     padding: 0.5rem;
