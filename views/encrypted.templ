@@ -14,7 +14,8 @@ templ Encrypted(data uuid.UUID, res types.Response) {
             </div>
         } else {
             <div>
-                <p>If the button below fails, try again after some time.</p>
+                <p>Your file id is { data.String() }. </p>
+                <p>You can get a download link using the button below, if you want to save a copy of the encrypted file.</p>
                 <button id="downloadButton"  hx-get={ fmt.Sprintf("/download/encrypted/%s", data.String()) }  hx-target="#downloadLink">Get Download URL for Encrypted File</button>
                 <a id="downloadLink"></a>
             </div>

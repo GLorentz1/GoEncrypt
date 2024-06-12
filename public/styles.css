@@ -17,15 +17,13 @@ header {
 header h1 {
     margin: 0;
 }
-nav ul {
-    list-style-type: none;
+nav ol {
     padding: 0;
-    display: flex;
-    justify-content: center;
     margin: 1rem 0 0 0;
+    list-style: none;  /* Remove default list styling if needed */
 }
-nav ul li {
-    margin: 0 1rem;
+nav ol li {
+    margin: 0 0 0 1rem;  /* Add margin only on the left to create space between items */
 }
 nav ul li a {
     color: #f4f4f4;
@@ -43,6 +41,13 @@ section {
     margin-bottom: 2rem;
     width: 100%;
     max-width: 600px;
+}
+section ol {
+    text-align: left;  /* Ensure the text within the ordered list is left-aligned */
+}
+section ol li {
+    margin-left: 1rem;  /* Add margin to the left for indentation */
+    text-align: left;   /* Ensure each list item is left-aligned */
 }
 footer {
     background-color: #7652ba;
@@ -79,4 +84,3 @@ form div {
     color: #ff6347;
     margin-top: 1rem;
 }
-
