@@ -30,14 +30,14 @@ func HandleEncryptedDownload(w http.ResponseWriter, req *http.Request, repositor
 
 	_, err := aws.HeadFile(repository.Client, id)
 	if err != nil {
-		_ = views.DownloadEncrypted("", types.Response{Status: http.StatusAccepted, Msg: "Your file is still being processed. Try again in a few minutes."}).Render(req.Context(), w)
+		_ = views.DownloadEncrypted("", types.Response{Status: http.StatusAccepted, Msg: "No file found with the supplied id. If your id is correct and not expired, try again in a few minutes because your file might still be processing."}).Render(req.Context(), w)
 		return
 	}
 
 	url, err := aws.GetPresignedUrl(repository, id)
 
 	if err != nil {
-		_ = views.DownloadEncrypted("", types.Response{Status: http.StatusAccepted, Msg: "Your file is still being processed. Try again in a few minutes."}).Render(req.Context(), w)
+		_ = views.DownloadEncrypted("", types.Response{Status: http.StatusAccepted, Msg: "No file found with the supplied id. If your id is correct and not expired, try again in a few minutes because your file might still be processing."}).Render(req.Context(), w)
 		return
 	}
 

@@ -14,8 +14,8 @@ templ Encrypted(data uuid.UUID, res types.Response) {
             </div>
         } else {
             <div>
-                <p>Your file id is { data.String() }. </p>
-                <button id="downloadButton"  hx-get={ fmt.Sprintf("/download/encrypted/%s", data.String()) }  hx-target="#downloadLink">Get Download URL for Encrypted File</button>
+                <p>Your file id is { data.String() }. It will expire in 7 days.</p>
+                <button id="downloadButton"  hx-get={ fmt.Sprintf("/download/encrypted/%s", data.String()) }  hx-target="#downloadLink">Get Download URL</button>
                 <a id="downloadLink"></a>
             </div>
         }
