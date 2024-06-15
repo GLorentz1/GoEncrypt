@@ -1,0 +1,23 @@
+package views
+
+import (
+        "github.com/google/uuid"
+        "fmt"
+        "GoEncryptApi/types"
+        )
+
+templ Encrypted(data uuid.UUID, res types.Response) {
+    <html>
+        if res.Status != 200 {
+            <div>
+                <p>There was an error, please try again. Error: { res.Msg }</p>
+            </div>
+        } else {
+            <div>
+                <p>Your file id is { data.String() }. It will expire in 7 days.</p>
+                <button id="downloadButton"  hx-get={ fmt.Sprintf("/download/encrypted/%s", data.String()) }  hx-target="#downloadLink">Get Download URL</button>
+                <a id="downloadLink"></a>
+            </div>
+        }
+    </html>
+}

@@ -1,0 +1,17 @@
+package views
+
+import "GoEncryptApi/types"
+
+templ DownloadEncrypted(url string, res types.Response) {
+    <html>
+            if res.Status != 200 {
+                <div>
+                    <p>Error: { res.Msg }</p>
+                </div>
+            } else {
+                <div>
+                    <p>Successfully generated download link: <a id="downloadLink" href={templ.URL(url)} download="encrypted_file" style="color: #7652ba">Download encrypted file</a></p>
+                </div>
+            }
+        </html>
+}

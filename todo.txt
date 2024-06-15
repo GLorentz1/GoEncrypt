@@ -1,0 +1,14 @@
+CRITICAL
+- Need to cancel multipart uploads when upload is blocked by file limits or by error
+
+HIGH
+- Hash password client-side
+- Keep original file extension using aws metadata (instead of always downloading as .txt)
+[DONE] Improve other endpoints error handling
+
+MEDIUM
+[DONE] Standardize error treatment in code (some places use log.fatal, others use log.print, others return http.errors)
+
+LOW
+- Rate-limit requests somehow (maybe IP addresses?)
+[DONE] Head file before generating download link (that way we can check if the upload has finished)

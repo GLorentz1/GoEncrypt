@@ -1,0 +1,165 @@
+package views
+
+templ Home() {
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>GoEncrypt - Secure Your Data</title>
+        <link rel="stylesheet" href="/public/styles.css">
+    </head>
+    <body>
+        <header>
+            <img src="/public/goencrypt_logo.png" height="80" width="80" alt="GoEncrypt Logo">
+            <h1>Welcome to GoEncrypt!</h1>
+        </header>
+
+        <main>
+            <section id="welcome-section">
+                <h2>Encrypt Your Data with Ease</h2>
+                <p>GoEncrypt provides you with secure encryption for all your data.<br>Encrypted files are kept on our servers for 7 days only.</p>
+            </section>
+
+            <section>
+                <hr>
+                <h2>Encrypt a File</h2>
+                <p style="font-size: smaller">Write down the returned id or download an encrypted copy!<br>Larger files take longer to process.</p>
+                <form id="encryptForm" hx-encoding="multipart/form-data" hx-post="/encrypt" hx-target="#encryptionResponsePlaceholder">
+                    <div>
+                        <label for="uploadFile">Select file to encrypt:</label>
+                        <input type="file" id="uploadFile" name="uploadFile" required>
+                        <label for="password">Enter password:</label>
+                        <input type="password" id="password" name="password" required>
+                        <button type="submit">Encrypt</button>
+                    </div>
+                    <div id="encryptionResponsePlaceholder"></div>
+                </form>
+
+                <hr>
+                <h2>Decrypt a File</h2>
+                <p style="font-size: smaller">Either upload the encrypted file or submit an id from a previous upload</p>
+                <form id="decryptForm" method="post" action="/decrypt" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-post="/decrypt" hx-swap="none">
+                    <div>
+                        <label for="uploadFileDecrypt">Select encrypted file (optional):</label>
+                        <input type="file" id="uploadFileDecrypt" name="uploadFile">
+
+                        <label for="fileId">Enter file id (optional):</label>
+                        <input type="text" id="fileId" name="fileId">
+
+                        <label for="decryptPassword">Enter password:</label>
+                        <input type="password" id="decryptPassword" name="password" required>
+
+                        <button type="submit">Decrypt</button>
+                    </div>
+                </form>
+                <div id="error-message"></div>
+
+
+                <hr>
+                <h2>Download encrypted copy</h2>
+                <p style="font-size: smaller">Is your file taking long to process? Come back some other time to download it.</p>
+                <form id="downloadEncryptedForm" method="get" action="/download/encrypted/" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-target="#downloadEncryptedPlaceholder">
+                    <div>
+                        <label for="fileIdToDownload">Enter file id:</label>
+                        <input type="text" id="fileIdToDownload" name="fileIdToDownload" required>
+                        <button type="submit">Get Download URL</button>
+                    </div>
+                </form>
+                <div id="downloadEncryptedPlaceholder"></div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2024 GoEncrypt. All rights reserved.</p>
+        </footer>
+
+        <!-- HTMX library -->
+        <script src="https://unpkg.com/htmx.org@1.7.0"></script>
+
+        <!-- Custom script to handle file download and error display -->
+        <script>
+            document.getElementById('decryptForm').addEventListener('submit', function(event) {
+                event.preventDefault();
+                const formData = new FormData(this);
+
+                fetch('/decrypt', {
+                    method: 'POST',
+                    body: formData
+                }).then(response => {
+                    if (response.ok) {
+                        var errorMessage = document.getElementById('error-message');
+                        errorMessage.textContent = '';
+
+                        const contentDisposition = response.headers.get('Content-Disposition');
+                        let filename = 'decrypted-file';
+                        if (contentDisposition) {
+                            const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                            if (filenameMatch && filenameMatch.length === 2) {
+                                filename = filenameMatch[1];
+                            }
+                        }
+
+                        const reader = response.body.getReader();
+                        const stream = new ReadableStream({
+                            start(controller) {
+                                function push() {
+                                    reader.read().then(({ done, value }) => {
+                                        if (done) {
+                                            controller.close();
+                                            return;
+                                        }
+                                        controller.enqueue(value);
+                                        push();
+                                    });
+                                }
+                                push();
+                            }
+                        });
+
+                        return new Response(stream).blob().then(blob => {
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = filename;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        });
+                    } else {
+                        var errorMessage = document.getElementById('error-message');
+                        errorMessage.textContent = 'Decryption failed: ' + response.text();
+                    }
+                }).catch(error => {
+                    var errorMessage = document.getElementById('error-message');
+                    errorMessage.textContent = 'Error: ' + error;
+                });
+            });
+
+            document.body.addEventListener('htmx:responseError', function(evt) {
+                var errorMessage = document.getElementById('error-message');
+                errorMessage.textContent = 'Decryption failed: ' + evt.detail.xhr.statusText;
+            });
+        </script>
+        <script>
+            document.getElementById('downloadEncryptedForm').addEventListener('submit', function(event) {
+                event.preventDefault(); // Prevent the form from submitting the traditional way
+                const fileId = document.getElementById('fileIdToDownload').value;
+                const url = `/download/encrypted/${fileId}`;
+
+                fetch(url)
+                    .then(response => response.text()) // Assuming the response is text (HTML)
+                    .then(html => {
+                        // Set the inner HTML of the response div
+                        document.getElementById('downloadEncryptedPlaceholder').innerHTML = html;
+                    })
+                    .catch(error => {
+                        // Handle any errors
+                        console.error('Error:', error);
+                        document.getElementById('downloadEncryptedPlaceholder').innerHTML = `<p>An error occurred. Please try again later.</p>`;
+                    });
+            });
+        </script>
+    </body>
+    </html>
+}

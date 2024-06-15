@@ -1,0 +1,15 @@
+package views
+
+import (
+        "GoEncryptApi/types"
+        )
+
+templ Decryption(res types.Response) {
+    <html>
+        if res.Status != 200 {
+            <div>
+                <p>There was an error, please try again. Error: { res.Msg }</p>
+            </div>
+        }
+    </html>
+}
