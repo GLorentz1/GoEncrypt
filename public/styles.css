@@ -7,28 +7,46 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    align-items: center;  /* Center the content horizontally */
+    text-align: center;   /* Center the text in the body */
 }
+
 header {
     background-color: #7652ba;
     padding: 1rem;
     text-align: center;
+    width: 100%;          /* Ensure the header takes the full width */
     margin-top: 1rem;
 }
+
+header img {
+    display: block;
+    margin: 0 auto;      /* Center the image */
+}
+
 header h1 {
     margin: 0;
 }
+
+header section {
+    text-align: center;
+}
+
 nav ol {
     padding: 0;
     margin: 1rem 0 0 0;
-    list-style: none;  /* Remove default list styling if needed */
+    list-style: none;    /* Remove default list styling if needed */
 }
+
 nav ol li {
     margin: 0 0 0 1rem;  /* Add margin only on the left to create space between items */
 }
+
 nav ul li a {
     color: #f4f4f4;
     text-decoration: none;
 }
+
 main {
     padding: 2rem;
     text-align: center;
@@ -36,25 +54,32 @@ main {
     display: flex;
     flex-direction: column;
     align-items: center;
+    width: 100%;
 }
+
 section {
     margin-bottom: 2rem;
     width: 100%;
     max-width: 600px;
 }
+
 section ol {
-    text-align: left;  /* Ensure the text within the ordered list is left-aligned */
+    text-align: left;    /* Ensure the text within the ordered list is left-aligned */
 }
+
 section ol li {
-    margin-left: 1rem;  /* Add margin to the left for indentation */
-    text-align: left;   /* Ensure each list item is left-aligned */
+    margin-left: 1rem;   /* Add margin to the left for indentation */
+    text-align: left;    /* Ensure each list item is left-aligned */
 }
+
 footer {
     background-color: #7652ba;
     text-align: center;
     padding: 1rem;
     margin-top: auto;
+    width: 100%;         /* Ensure the footer takes the full width */
 }
+
 button {
     background-color: #7652ba;
     color: #f4f4f4;
@@ -62,24 +87,29 @@ button {
     padding: 0.5rem 1rem;
     cursor: pointer;
 }
+
 button:hover {
     background-color: #673fb5;
 }
-input[type="file"], input[type="password"], input[type="text"]{
+
+input[type="file"], input[type="password"], input[type="text"] {
     margin-bottom: 1rem;
     width: calc(100% - 1rem);
     padding: 0.5rem;
 }
+
 label {
     display: block;
     text-align: left;
     margin-bottom: 0.5rem;
     font-weight: bold;
 }
+
 form div {
     margin-bottom: 1rem;
     text-align: left;
 }
+
 #error-message {
     color: #ff6347;
     margin-top: 1rem;
