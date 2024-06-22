@@ -18,7 +18,7 @@ func main() {
 
 	declareRoutes(router, fileChannel, &s3Context)
 	go func() {
-		errListenAndServe := http.ListenAndServe("localhost:80", router)
+		errListenAndServe := http.ListenAndServe(":56789", router)
 		if errListenAndServe != nil {
 			panic(errListenAndServe)
 		}
